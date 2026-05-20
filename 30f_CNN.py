@@ -1,25 +1,26 @@
 import os
 import glob
-import numpy as np
 import pandas as pd
 import torch
-from torchvision import models, transforms
+from torchvision.models import mobilenet_v2, MobileNet_V2_Weights
+from torchvision import transforms
 from PIL import Image
 
-# 設定 
-IMAGE_FOLDER = r"C:\Users\DeepL_10\Desktop\pytorch\試し30フレーム\window_0056"      # 30枚画像フォルダ
-OUTPUT_CSV = "features.csv"
-IMG_SIZE = 224
+#入力（30フレーム画像フォルダ群
+ROOT_FOLDER = r"C:\Users\DeepL_10\Desktop\datasetwataranaiLSTM"
 
-# MobileNetV2 読み込み
+#出力
+SAVE_ROOT = r"C:\Users\DeepL_10\Desktop\pytorch\LSTMdataset\渡らない"
+
+IMG_SIZE = 224
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-model = models.mobilenet_v2(pretrained=True)
-model.classifier = torch.nn.Identity()   # 1280次元特徴量
+#MobileNet
+model = mobilenet_v2(weights=MobileNet_V2_Weights.DEFAULT)
+model.classifier = torch.nn.Identity()
 model.to(device)
 model.eval()
 
-# 前処理 
 transform = transforms.Compose([
     transforms.Resize((IMG_SIZE, IMG_SIZE)),
     transforms.ToTensor(),
@@ -27,28 +28,46 @@ transform = transforms.Compose([
                          [0.229, 0.224, 0.225])
 ])
 
-# 画像取得
-image_paths = sorted(glob.glob(os.path.join(IMAGE_FOLDER, "*.jpg")))
+seq_counter = 1
+windows = os.listdir(ROOT_FOLDER)
 
-assert len(image_paths) == 30, "30フレーム必要です"
+for win in windows:
+    win_path = os.path.join(ROOT_FOLDER, win)
+    if not os.path.isdir(win_path):
+        continue
 
-features_list = []
+    image_paths = sorted(glob.glob(os.path.join(win_path, "*.jpg")))
 
-# 特徴量抽出
-for idx, img_path in enumerate(image_paths):
-    img = Image.open(img_path).convert("RGB")
-    img = transform(img).unsqueeze(0).to(device)
+    #30枚無いフォルダはスキップ
+    if len(image_paths) != 30:
+        print("skip:", win)
+        continue
 
-    with torch.no_grad():
-        feature = model(img)          # (1,1280)
-        feature = feature.cpu().numpy().flatten()
+    print("processing:", win)
 
-    row = [idx] + feature.tolist()   # 先頭にフレーム番号追加
-    features_list.append(row)
+    #特徴量抽出
+    features_list = []
+    for idx, img_path in enumerate(image_paths):
+        img = Image.open(img_path).convert("RGB")
+        img = transform(img).unsqueeze(0).to(device)
 
-# CSV保存 
-columns = ["frame"] + [f"f{i}" for i in range(1280)]
-df = pd.DataFrame(features_list, columns=columns)
-df.to_csv(OUTPUT_CSV, index=False)
+        with torch.no_grad():
+            feature = model(img)
+            feature = feature.cpu().numpy().flatten()
 
-print("CSV保存完了:", OUTPUT_CSV)
+        features_list.append([idx] + feature.tolist())
+
+    #保存先 seqフォルダ
+    seq_name = f"seq{seq_counter:03d}"
+    save_dir = os.path.join(SAVE_ROOT, seq_name)
+    os.makedirs(save_dir, exist_ok=True)
+
+    df = pd.DataFrame(features_list, columns=["frame"] + [f"f{i}" for i in range(1280)])
+    csv_path = os.path.join(save_dir, "features.csv")
+    df.to_csv(csv_path, index=False)
+
+    print("saved →", csv_path)
+
+    seq_counter += 1
+
+print("保存完了")

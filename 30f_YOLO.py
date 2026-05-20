@@ -6,11 +6,11 @@ import torch
 from collections import deque
 
 WINDOW_SIZE = 30
-SAVE_ROOT = "person_windows"
+SAVE_ROOT = "person_windows1"
 os.makedirs(SAVE_ROOT, exist_ok=True)
 
-model = YOLO(r"C:\Users\DeepL_10\Desktop\pytorch\yolo11x.pt")
-cap = cv2.VideoCapture(r"C:\Users\DeepL_10\Desktop\試し.mp4")
+model = YOLO(r"C:\Users\DeepL_10\Desktop\pytorch2\yolo11x.pt")
+cap = cv2.VideoCapture(r"C:\Users\DeepL_10\Desktop\歩行データまとめ\渡らない3.mp4")
 
 frame_times = []
 frame_count = 0
